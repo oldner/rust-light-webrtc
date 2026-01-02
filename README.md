@@ -1,6 +1,6 @@
 ### Simple Rust WebRTC
 
-this is a very simple implementation of webrtc using Rust to see trade-offs of Rust language.
+this is a very simple implementation of webrtc using Rust (with its advanced concepts) to see trade-offs of Rust language and deep memory management concepts.
 
 just run
 ```bash
