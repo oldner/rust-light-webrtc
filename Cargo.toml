@@ -1,0 +1,15 @@
+[package]
+name = "webrtc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.48", features = ["full"] }
+webrtc = "0.12"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+warp = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"

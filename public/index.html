@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust SFU Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        video {
+            background: #1a1a1a;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            transform: scaleX(-1); /* Mirror local video */
+        }
+        .remote-video {
+            transform: scaleX(1); /* Don't mirror remote video */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-8">
+<h1 class="text-3xl font-bold mb-8">Rust Media Server Test</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+    <div class="flex flex-col items-center">
+        <h2 class="text-xl mb-2 text-gray-400">Local (Broadcaster)</h2>
+        <video id="localVideo" autoplay playsinline muted></video>
+    </div>
+    <div class="flex flex-col items-center">
+        <h2 class="text-xl mb-2 text-gray-400">Remote (From SFU)</h2>
+        <video id="remoteVideo" class="remote-video" autoplay playsinline></video>
+    </div>
+</div>
+
+<div class="mt-8 space-x-4">
+    <button id="startButton" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-full font-bold transition">
+        Start Stream
+    </button>
+    <div id="status" class="mt-4 text-sm text-gray-500 text-center">
+        Ready to connect...
+    </div>
+</div>
+
+<script>
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const startButton = document.getElementById('startButton');
+    const statusDiv = document.getElementById('status');
+
+    const peerId = 'user-' + Math.random().toString(36).substr(2, 9);
+
+    async function start() {
+        // ... (getUserMedia part) ...
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        localVideo.srcObject = stream;
+
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        // DEBUG: Monitor connection state
+        pc.onconnectionstatechange = () => {
+            console.log("Connection State:", pc.connectionState);
+            statusDiv.innerText = "Connection: " + pc.connectionState;
+        };
+
+        // 3. Add local tracks
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        // 4. Handle incoming tracks
+        pc.ontrack = (event) => {
+            console.log("Remote track received:", event);
+            // event.streams[0] is the "main-stream" we named in Rust
+            if (event.streams && event.streams[0]) {
+                remoteVideo.srcObject = event.streams[0];
+            } else {
+                // Fallback for browsers that don't group tracks into streams automatically
+                const newStream = new MediaStream([event.track]);
+                remoteVideo.srcObject = newStream;
+            }
+            statusDiv.innerText = "Receiving Remote Stream!";
+        };
+
+        // 5. Offer/Answer Handshake (Ensure we force VP8 or let Rust decide)
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // ... (wait for ICE gathering) ...
+
+        const response = await fetch('/signal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ peerId: peerId, offer: pc.localDescription })
+        });
+
+        const answer = await response.json();
+        console.log("Received Answer from Rust:", answer);
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    }
+
+    startButton.onclick = start;
+</script>
+</body>
+</html>
